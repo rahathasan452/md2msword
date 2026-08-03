@@ -152,7 +152,7 @@
 
         html = html.replace(/blockquote>\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*([\s\S]*?)<\/blockquote/gi, (_, type, body) => {
             const config = alertTypes[type.toUpperCase()] || alertTypes['NOTE'];
-            return `table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 10pt 0; width: 100%;">\n<tr>\n  <td style="border-left: 4pt solid ${config.color}; background-color: ${config.bg}; padding: 8pt 12pt; color: #24292F; font-size: 11pt;">\n    <p style="font-weight: bold; color: ${config.color}; margin: 0 0 4pt 0; font-size: 10.5pt;">${config.title}</p>\n    <div>${body.trim()}</div>\n  </td>\n</tr>\n</table`;
+            return `table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 10pt 0; width: 100%;">\n<tr>\n  <td style="border-left: 4pt solid ${config.color}; background-color: ${config.bg}; padding: 8pt 12pt; color: #24292F; font-size: 11pt; text-align: left !important; text-align-last: left !important; word-spacing: normal !important; letter-spacing: normal !important;">\n    <p style="font-weight: bold; color: ${config.color}; margin: 0 0 4pt 0; font-size: 10.5pt; text-align: left !important; text-align-last: left !important; word-spacing: normal !important; letter-spacing: normal !important;">${config.title}</p>\n    <div style="color: #24292F; font-size: 11pt; text-align: left !important; text-align-last: left !important; word-spacing: normal !important; letter-spacing: normal !important;">${body.trim()}</div>\n  </td>\n</tr>\n</table`;
         });
 
         // Fallback inline alert titles
@@ -169,7 +169,7 @@
 
         // 4. Accordion Details / Summary
         html = html.replace(/<details[^>]*>\s*<summary[^>]*>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/gi, (_, title, content) => {
-            return `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 10pt 0; width: 100%;">\n<tr>\n  <td style="border: 1pt solid #BFBFBF; background-color: #F8F9FA; padding: 8pt 12pt; border-radius: 3pt;">\n    <p style="font-weight: bold; color: #1F4E79; margin: 0 0 6pt 0; font-size: 11pt;">▶ ${title.trim()}</p>\n    <div>${content.trim()}</div>\n  </td>\n</tr>\n</table>`;
+            return `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 10pt 0; width: 100%;">\n<tr>\n  <td style="border: 1pt solid #BFBFBF; background-color: #F8F9FA; padding: 8pt 12pt; border-radius: 3pt; text-align: left !important; text-align-last: left !important; word-spacing: normal !important;">\n    <p style="font-weight: bold; color: #1F4E79; margin: 0 0 6pt 0; font-size: 11pt; text-align: left !important;">▶ ${title.trim()}</p>\n    <div style="text-align: left !important;">${content.trim()}</div>\n  </td>\n</tr>\n</table>`;
         });
 
         // 5. Depth-Aware Nested Blockquote Office Tables
@@ -188,7 +188,7 @@
             } else {
                 const theme = bqThemes[bqDepth % bqThemes.length];
                 bqDepth++;
-                return `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 6pt 0; width: 100%;"><tr><td style="border-left: 4pt solid ${theme.border}; background-color: ${theme.bg}; padding: 6pt 10pt 6pt 12pt; color: #262626; font-style: italic;">`;
+                return `<table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 6pt 0; width: 100%;"><tr><td style="border-left: 4pt solid ${theme.border}; background-color: ${theme.bg}; padding: 6pt 10pt 6pt 12pt; color: #262626; font-style: italic; text-align: left !important; text-align-last: left !important; word-spacing: normal !important; letter-spacing: normal !important;">`;
             }
         });
 
@@ -364,14 +364,18 @@
 <title>MD2MSWord Document</title>
 <style>
   /* Microsoft Word Document Styles */
-  body, p, li {
+  body, p, li, td, th, div {
       font-family: '${targetFont}', sans-serif;
       font-size: 11pt;
       line-height: 1.25;
       color: #000000;
+      text-align: left;
+      word-spacing: normal;
+      letter-spacing: normal;
   }
   p {
       margin: 0 0 6pt 0;
+      text-align: left;
   }
   h1 {
       font-family: '${targetFont}', sans-serif;
