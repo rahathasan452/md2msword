@@ -48,9 +48,10 @@ When copying raw AI output containing KaTeX HTML into MS Word Desktop:
 ## 🛠️ How to Use
 
 1. Open the live web app: **[https://rahathasan452.github.io/md2msword/](https://rahathasan452.github.io/md2msword/)**
-2. Paste Markdown text from ChatGPT, Claude, Gemini, or DeepSeek into the left editor box.
-3. Click **Copy for MS Word** (or press <kbd>Ctrl</kbd> + <kbd>Enter</kbd>).
-4. Open **installed Microsoft Word Desktop software** and press <kbd>Ctrl</kbd> + <kbd>V</kbd> to paste.
+2. Paste Markdown text from ChatGPT, Claude, Gemini, or DeepSeek into the left editor panel.
+3. Choose your target **Word Font** and **Heading Accent Color** from the top control strip.
+4. Click **Copy for MS Word** (or press <kbd>Ctrl</kbd> + <kbd>Enter</kbd>).
+5. Open **installed Microsoft Word Desktop software**, press <kbd>Ctrl</kbd> + <kbd>V</kbd> to paste, and ensure **Keep Source Formatting (K)** is selected in Word's Paste Options popup menu if prompted.
 
 ---
 
