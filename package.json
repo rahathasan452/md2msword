@@ -1,0 +1,21 @@
+{
+  "name": "md2msword",
+  "version": "2.0.0",
+  "description": "Convert Markdown & TeX Math equations from AI (ChatGPT, Claude, Gemini, DeepSeek) to Rich Text + MathML formatted specifically for Microsoft Word Desktop software.",
+  "main": "app.js",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "markdown",
+    "msword",
+    "word",
+    "math",
+    "katex",
+    "mathml",
+    "latex",
+    "omml"
+  ],
+  "author": "",
+  "license": "MIT"
+}

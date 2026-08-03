@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD2MSWord — AI Markdown to MS Word Desktop</title>
+    <meta name="description" content="Convert Markdown with TeX Math from ChatGPT, Claude, Gemini, or DeepSeek directly into Microsoft Word Desktop software with editable MathML equations.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- KaTeX CSS for Web Preview -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header Bar -->
+        <header class="top-header">
+            <div class="brand">
+                <div class="logo-badge">W</div>
+                <div class="brand-text">
+                    <h1>MD2MSWord</h1>
+                    <span class="sub-badge">MS Word Desktop Engine</span>
+                </div>
+            </div>
+
+
+
+            <div class="header-actions">
+                <button id="clearBtn" class="btn btn-ghost" title="Clear input text">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    <span>Clear</span>
+                </button>
+                <button id="copyWordBtn" class="btn btn-primary" title="Copy formatted text + MathML to Clipboard for MS Word Desktop (Ctrl+Enter)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    <span>Copy for MS Word</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Config Control Strip -->
+        <div class="config-strip">
+            <div class="config-group">
+                <div class="config-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                    <label for="fontSelect">Word Target Font:</label>
+                    <select id="fontSelect" class="config-select">
+                        <option value="Calibri" selected>Calibri (Word Standard)</option>
+                        <option value="Aptos">Aptos (Word 365 Default)</option>
+                        <option value="Times New Roman">Times New Roman (Academic)</option>
+                        <option value="Georgia">Georgia (Classic Serif)</option>
+                        <option value="Segoe UI">Segoe UI (Modern Clean)</option>
+                        <option value="Arial">Arial (Sans Serif)</option>
+                        <option value="Cambria">Cambria (Math & Technical)</option>
+                        <option value="Verdana">Verdana (Wide Readable)</option>
+                    </select>
+                </div>
+
+                <div class="config-item">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.74 1.7-1.67 0-.43-.17-.83-.44-1.13-.27-.3-.44-.7-.44-1.2 0-.93.74-1.67 1.67-1.67H17c2.76 0 5-2.24 5-5s-2.24-5-5-5h-5z"/></svg>
+                    <label for="headingColorSelect">Heading Accent Color:</label>
+                    <span id="colorSwatch" class="color-swatch" style="background-color: #1F4E79;"></span>
+                    <select id="headingColorSelect" class="config-select">
+                        <option value="#1F4E79" selected>Word Navy (#1F4E79)</option>
+                        <option value="#8B0000">Crimson Academic (#8B0000)</option>
+                        <option value="#005F73">Deep Teal (#005F73)</option>
+                        <option value="#262626">Classic Charcoal (#262626)</option>
+                        <option value="#046A38">Emerald Green (#046A38)</option>
+                        <option value="#4A154B">Royal Purple (#4A154B)</option>
+                        <option value="#C0392B">Burnt Orange (#C0392B)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-item">
+                <span class="info-pill">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    Strips KaTeX visual duplication & Injects MathML for MS Word Desktop
+                </span>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Left: Markdown Input -->
+            <section class="panel input-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Paste AI Markdown</span>
+                    </div>
+                    <span class="shortcut-tip"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to copy</span>
+                </div>
+                <textarea id="markdownInput" class="code-editor" placeholder="Paste your markdown with LaTeX equations ($...$ or $$...$$) from ChatGPT, Gemini, Claude, or DeepSeek..."></textarea>
+            </section>
+
+            <!-- Center Divider -->
+            <div class="workspace-divider">
+                <div class="arrow-pill">→</div>
+            </div>
+
+            <!-- Right: Web Preview -->
+            <section class="panel preview-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span>Live Word Document Preview</span>
+                    </div>
+                    <div class="status-indicator">
+                        <span class="pulse-dot"></span>
+                        <span>Formatted Output</span>
+                    </div>
+                </div>
+                <div class="preview-viewport">
+                    <div id="wordPreview" class="document-page"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer Bar -->
+        <footer class="app-footer">
+            <div class="footer-step"><span class="num">1</span> Copy response from ChatGPT / Claude / DeepSeek</div>
+            <div class="footer-arrow">→</div>
+            <div class="footer-step"><span class="num">2</span> Paste into left box</div>
+            <div class="footer-arrow">→</div>
+            <div class="footer-step"><span class="num">3</span> Click <strong>Copy for MS Word</strong></div>
+            <div class="footer-arrow">→</div>
+            <div class="footer-step"><span class="num">4</span> Press <kbd>Ctrl</kbd> + <kbd>V</kbd> in MS Word Desktop</div>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="toast"></div>
+
+
+
+    <!-- Libraries: Marked & KaTeX -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@14.1.4/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <!-- Core Application JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

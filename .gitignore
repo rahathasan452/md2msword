@@ -1,0 +1,10 @@
+# Node dependencies
+node_modules/
+package-lock.json
+
+# System / OS
+.DS_Store
+Thumbs.db
+
+# Environment & Temp
+*.log
