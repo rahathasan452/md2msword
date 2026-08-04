@@ -173,7 +173,7 @@
         });
 
         // 5. Depth-Aware Nested Blockquote Office Tables
-        const headingColor = headingColorSelect.value || '#1F4E79';
+        const headingColor = headingColorSelect.value || '#262626';
         const bqThemes = [
             { border: headingColor, bg: '#F0F4F8' },
             { border: '#2F5597', bg: '#E6ECF5' },
@@ -268,8 +268,8 @@
         wordPreview.replaceChildren(...safeContainer.childNodes);
 
         // Apply selected font style & heading accent color to preview
-        const selectedFont = fontSelect.value || 'Calibri';
-        const selectedHeadingColor = headingColorSelect.value || '#1F4E79';
+        const selectedFont = fontSelect.value || 'Times New Roman';
+        const selectedHeadingColor = headingColorSelect.value || '#262626';
 
         wordPreview.style.fontFamily = `'${selectedFont}', sans-serif`;
 
@@ -293,8 +293,8 @@
      * without KaTeX visual DOM nodes to avoid character doubling when pasting into Word.
      */
     function buildWordHtmlPayload(rawMarkdown) {
-        const targetFont = fontSelect.value || 'Calibri';
-        const headingColor = headingColorSelect.value || '#1F4E79';
+        const targetFont = fontSelect.value || 'Times New Roman';
+        const headingColor = headingColorSelect.value || '#262626';
 
         // 1. Extract Math
         const { text, mathBlocks } = extractMath(rawMarkdown);

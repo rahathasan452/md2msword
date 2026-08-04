@@ -411,7 +411,7 @@ kbd {
     padding: 50px 60px;
     border-radius: 2px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    font-family: 'Calibri', sans-serif;
+    font-family: 'Times New Roman', Times, serif;
     font-size: 11pt;
     line-height: 1.25;
     margin-bottom: 50px;
@@ -431,7 +431,7 @@ kbd {
 .document-page h1 {
     font-size: 16pt;
     font-weight: bold;
-    color: #1F4E79;
+    color: #262626;
     margin: 14pt 0 6pt 0;
     border-bottom: 1px solid #D9D9D9;
     padding-bottom: 4px;
@@ -440,14 +440,14 @@ kbd {
 .document-page h2 {
     font-size: 13pt;
     font-weight: bold;
-    color: #2F5597;
+    color: #262626;
     margin: 12pt 0 4pt 0;
 }
 
 .document-page h3 {
     font-size: 12pt;
     font-weight: bold;
-    color: #1F4E79;
+    color: #262626;
     margin: 10pt 0 3pt 0;
 }
 
