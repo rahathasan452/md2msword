@@ -52,15 +52,23 @@
         });
 
         // 2. Standard Display Math ($$ ... $$ or \[ ... \])
-        text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => {
+        text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, tex, offset, fullText) => {
+            const lineStart = fullText.lastIndexOf('\n', offset);
+            const lineEnd = fullText.indexOf('\n', offset + match.length);
+            const line = fullText.substring(lineStart === -1 ? 0 : lineStart + 1, lineEnd === -1 ? fullText.length : lineEnd);
+            const isInsideTable = line.includes('|');
             const ph = `\x00DMATH_${index}\x00`;
-            mathBlocks.push({ index: index++, tex: tex.trim(), display: true, ph });
-            return `\n\n${ph}\n\n`;
+            mathBlocks.push({ index: index++, tex: tex.trim(), display: !isInsideTable, ph });
+            return isInsideTable ? ph : `\n\n${ph}\n\n`;
         });
-        text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => {
+        text = text.replace(/\\\[([\s\S]+?)\\\]/g, (match, tex, offset, fullText) => {
+            const lineStart = fullText.lastIndexOf('\n', offset);
+            const lineEnd = fullText.indexOf('\n', offset + match.length);
+            const line = fullText.substring(lineStart === -1 ? 0 : lineStart + 1, lineEnd === -1 ? fullText.length : lineEnd);
+            const isInsideTable = line.includes('|');
             const ph = `\x00DMATH_${index}\x00`;
-            mathBlocks.push({ index: index++, tex: tex.trim(), display: true, ph });
-            return `\n\n${ph}\n\n`;
+            mathBlocks.push({ index: index++, tex: tex.trim(), display: !isInsideTable, ph });
+            return isInsideTable ? ph : `\n\n${ph}\n\n`;
         });
 
         // 3. ChatGPT / Markdown Unescaped Bracket Display Math:
@@ -122,6 +130,418 @@
     }
 
     // =========================================================================
+    // Robust Markdown Table Normalization Engine
+    // =========================================================================
+
+    /**
+     * Splits string by unescaped pipes (|) taking into account escaped backslashes (\\)
+     */
+    function splitByUnescapedPipe(str) {
+        const parts = [];
+        let cur = '';
+        for (let idx = 0; idx < str.length; idx++) {
+            const char = str[idx];
+            if (char === '\\' && idx + 1 < str.length) {
+                cur += char + str[idx + 1];
+                idx++;
+            } else if (char === '|') {
+                parts.push(cur);
+                cur = '';
+            } else {
+                cur += char;
+            }
+        }
+        parts.push(cur);
+        return parts;
+    }
+
+    /**
+     * Counts unescaped pipes in a string
+     */
+    function countPipes(str) {
+        if (!str) return 0;
+        return splitByUnescapedPipe(str).length - 1;
+    }
+
+    /**
+     * Checks if a line is a table delimiter row (e.g. | --- | :---: | ---: | or --- | ---)
+     */
+    function isTableDelimiter(line) {
+        if (!line) return false;
+        const trimmed = line.trim();
+        // A markdown table delimiter MUST contain at least one pipe '|' and hyphens
+        if (!trimmed.includes('|') || !trimmed.includes('-')) return false;
+        const stripped = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+        if (!stripped) return false;
+        const parts = splitByUnescapedPipe(stripped);
+        if (parts.length === 0) return false;
+        return parts.every(part => /^[\s:]*-+[\s:]*$/.test(part));
+    }
+
+    /**
+     * Checks if a line represents a markdown block boundary (headings, hr, code blocks, etc.)
+     */
+    function isTableBlockBoundary(line) {
+        if (!line) return false;
+        const trimmed = line.trim();
+        if (/^#{1,6}\s/.test(trimmed)) return true; // Headings
+        if (/^(---|___|\*\*\*)\s*$/.test(trimmed)) return true; // Horizontal rules (without pipes)
+        if (/^>\s*/.test(trimmed)) return true; // Blockquotes
+        if (/^<\/?(div|section|article|table|ul|ol|p|h[1-6]|blockquote)\b/i.test(trimmed)) return true;
+        if (/^```/.test(trimmed)) return true; // Code blocks
+        return false;
+    }
+
+    /**
+     * Assembles a list of raw table lines into clean, unified markdown table rows:
+     * - Reconnects rows split across multiple lines or by blank lines
+     * - Fixes trailing pipes on separate lines (e.g. text \n\n |)
+     * - Combines multiline cell content cleanly with <br>
+     * - Ensures exact column counts and proper outer pipes
+     */
+    function assembleTableRows(lines, expectedCols) {
+        const rows = [];
+        let currentRowChunks = [];
+        let currentPipeCount = 0;
+
+        function flushRow() {
+            if (currentRowChunks.length === 0) return;
+
+            let combined = '';
+            for (let idx = 0; idx < currentRowChunks.length; idx++) {
+                const chunk = currentRowChunks[idx].trim();
+                if (!chunk) continue;
+                if (idx === 0) {
+                    combined = chunk;
+                } else if (chunk.startsWith('|')) {
+                    combined += ' ' + chunk;
+                } else {
+                    combined += '<br>' + chunk;
+                }
+            }
+
+            // Do not create a table row if the accumulated chunk had no pipes at all
+            if (currentPipeCount === 0 && !combined.includes('|')) {
+                currentRowChunks = [];
+                currentPipeCount = 0;
+                return;
+            }
+
+            // Ensure outer pipes
+            if (!combined.startsWith('|')) combined = '| ' + combined;
+            if (!combined.endsWith('|')) combined = combined + ' |';
+
+            const rawCells = splitByUnescapedPipe(combined.replace(/^\|/, '').replace(/\|$/, ''))
+                .map(c => c.trim().replace(/\r?\n+/g, ' '));
+
+            // If all cells are completely empty, don't create a phantom row
+            if (rawCells.every(c => c === '')) {
+                currentRowChunks = [];
+                currentPipeCount = 0;
+                return;
+            }
+
+            // Pad cells if fewer than expectedCols
+            while (rawCells.length < expectedCols) {
+                rawCells.push('');
+            }
+
+            const cleanRow = '| ' + rawCells.join(' | ') + ' |';
+            rows.push(cleanRow);
+
+            currentRowChunks = [];
+            currentPipeCount = 0;
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (!trimmed) {
+                // Skip empty lines between or inside table rows
+                continue;
+            }
+
+            const pipesInLine = countPipes(trimmed);
+
+            // Check if current row already has enough pipes and next line starts with '|'
+            if (currentRowChunks.length > 0 && currentPipeCount >= expectedCols + 1 && trimmed.startsWith('|')) {
+                flushRow();
+            }
+
+            currentRowChunks.push(trimmed);
+            currentPipeCount += pipesInLine;
+
+            // If line ends with '|' and pipe count has reached target
+            if (trimmed.endsWith('|') && currentPipeCount >= expectedCols + 1) {
+                flushRow();
+            }
+        }
+
+        if (currentRowChunks.length > 0) {
+            flushRow();
+        }
+
+        return rows;
+    }
+
+    /**
+     * Synthesizes missing delimiter rows for raw pipe tables that have no | --- | row.
+     * For well-formed tables (already have a delimiter) this is a strict no-op.
+     */
+    function synthesizeMissingDelimiters(markdown) {
+        const lines = markdown.split(/\r?\n/);
+        const newLines = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const cur = lines[i].trim();
+            newLines.push(lines[i]);
+
+            if (cur.startsWith('|') && cur.endsWith('|') && !isTableDelimiter(cur)) {
+                const cells = splitByUnescapedPipe(cur.replace(/^\|/, '').replace(/\|$/, ''));
+                if (cells.length >= 2) {
+                    let nextIdx = i + 1;
+                    while (nextIdx < lines.length && !lines[nextIdx].trim()) {
+                        nextIdx++;
+                    }
+                    if (nextIdx < lines.length) {
+                        const next = lines[nextIdx].trim();
+                        if (!isTableDelimiter(next) && next.startsWith('|') && next.endsWith('|')) {
+                            const nextCells = splitByUnescapedPipe(next.replace(/^\|/, '').replace(/\|$/, ''));
+                            if (nextCells.length === cells.length) {
+                                let prevIdx = i - 1;
+                                while (prevIdx >= 0 && !lines[prevIdx].trim()) {
+                                    prevIdx--;
+                                }
+                                const prevIsTableRow = prevIdx >= 0 && lines[prevIdx].trim().startsWith('|') && lines[prevIdx].trim().endsWith('|');
+                                if (!prevIsTableRow) {
+                                    const synthDelim = '| ' + cells.map(() => '---').join(' | ') + ' |';
+                                    newLines.push(synthDelim);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return newLines.join('\n');
+    }
+
+    /**
+     * Locates, normalizes, and repairs all tables across the markdown text
+     */
+    function repairMarkdownTables(markdown) {
+        if (!markdown || !markdown.includes('|')) {
+            return markdown;
+        }
+
+        const lines = markdown.split(/\r?\n/);
+        const outputLines = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            if (isTableDelimiter(lines[i])) {
+                const delimIdx = i;
+                const delimLine = lines[delimIdx].trim();
+                const delimCells = splitByUnescapedPipe(delimLine.replace(/^\|/, '').replace(/\|$/, '')).map(c => c.trim());
+                const colCount = Math.max(1, delimCells.length);
+
+                // 1. Backtrack to find the header lines from outputLines
+                const headerLines = [];
+                let headerPipes = 0;
+                let headerIsComplete = false;
+
+                while (outputLines.length > 0) {
+                    const prev = outputLines[outputLines.length - 1];
+                    const prevTrimmed = prev.trim();
+
+                    // If empty line:
+                    if (!prevTrimmed) {
+                        // If we already collected a complete header row, stop!
+                        if (headerIsComplete) {
+                            break;
+                        }
+                        // If we haven't collected any header line yet, pop blank line immediately before delimiter
+                        if (headerLines.length === 0) {
+                            outputLines.pop();
+                            continue;
+                        }
+                        // If header is in progress (broken multi-line header), check if preceding line has '|'
+                        const peekIdx = outputLines.length - 2;
+                        if (peekIdx >= 0 && outputLines[peekIdx].includes('|') && !isTableBlockBoundary(outputLines[peekIdx])) {
+                            outputLines.pop();
+                            continue;
+                        }
+                        break;
+                    }
+
+                    // A line can ONLY belong to a table header if it contains '|'
+                    if (!prevTrimmed.includes('|') || isTableBlockBoundary(prevTrimmed)) {
+                        break;
+                    }
+
+                    const pipesInPrev = countPipes(prevTrimmed);
+                    headerPipes += pipesInPrev;
+
+                    headerLines.unshift(outputLines.pop());
+
+                    // In standard markdown, header is a single row. Once it has enough pipes, stop backtracking!
+                    if (headerPipes >= colCount + 1) {
+                        headerIsComplete = true;
+                        break;
+                    }
+                }
+
+                // If no header lines were found, synthesize default headers
+                if (headerLines.length === 0) {
+                    const defaultHeader = [];
+                    for (let c = 1; c <= colCount; c++) defaultHeader.push(`Column ${c}`);
+                    headerLines.push('| ' + defaultHeader.join(' | ') + ' |');
+                }
+
+                // 2. Scan forward to find the body lines
+                const bodyLines = [];
+                i = delimIdx + 1;
+                let rowPipes = 0;
+                let rowIsComplete = true; // Right after delimiter, ready for first body row
+
+                while (i < lines.length) {
+                    const cur = lines[i];
+                    const curTrimmed = cur.trim();
+
+                    // Handle empty lines
+                    if (!curTrimmed) {
+                        // Look ahead to the next non-empty line
+                        let nextIdx = i + 1;
+                        while (nextIdx < lines.length && !lines[nextIdx].trim()) {
+                            nextIdx++;
+                        }
+                        if (nextIdx >= lines.length) {
+                            break; // Reached end of document
+                        }
+                        const nextTrimmed = lines[nextIdx].trim();
+
+                        // If the current row was complete AND next non-empty line does not start with '|':
+                        // The table has definitely ended!
+                        if (rowIsComplete && !nextTrimmed.startsWith('|')) {
+                            break;
+                        }
+
+                        // If next line is a block boundary or list:
+                        if (isTableBlockBoundary(nextTrimmed) || /^(\*|-|\+|\d+\.)\s/.test(nextTrimmed)) {
+                            if (rowIsComplete) {
+                                break;
+                            }
+                        }
+
+                        bodyLines.push(cur);
+                        i++;
+                        continue;
+                    }
+
+                    // 1. Check if line is an explicit block boundary (heading, hr, code block, etc.)
+                    if (isTableBlockBoundary(curTrimmed)) {
+                        break;
+                    }
+
+                    // 2. Check if line is a list item and current row is complete
+                    if (/^(\*|-|\+|\d+\.)\s/.test(curTrimmed) && rowIsComplete) {
+                        break;
+                    }
+
+                    // 3. Check if line has NO pipes at all
+                    if (!curTrimmed.includes('|')) {
+                        // If the previous row was complete, normal text without pipes ends the table!
+                        if (rowIsComplete) {
+                            break;
+                        }
+                    }
+
+                    // Add line to body
+                    bodyLines.push(cur);
+                    i++;
+
+                    // Update row completion status
+                    const linePipes = countPipes(curTrimmed);
+                    rowPipes += linePipes;
+
+                    if (rowPipes >= colCount + 1 && curTrimmed.endsWith('|')) {
+                        rowIsComplete = true;
+                        rowPipes = 0;
+                    } else if (curTrimmed.startsWith('|') && rowPipes >= colCount + 1) {
+                        rowIsComplete = true;
+                        rowPipes = 0;
+                    } else {
+                        rowIsComplete = false;
+                    }
+                }
+
+                // 3. Assemble clean header and body rows
+                const cleanHeaderRows = assembleTableRows(headerLines, colCount);
+                const rawBodyRows = assembleTableRows(bodyLines, colCount);
+
+                // Filter out any phantom empty rows
+                const cleanBodyRows = rawBodyRows.filter(row => {
+                    const cells = splitByUnescapedPipe(row.replace(/^\|/, '').replace(/\|$/, ''));
+                    return cells.some(c => c.trim() !== '');
+                });
+
+                // A markdown table header is strictly ONE row directly above the delimiter
+                let headerRow = '';
+                if (cleanHeaderRows.length > 0) {
+                    headerRow = cleanHeaderRows[cleanHeaderRows.length - 1];
+                    // If multiple rows were in cleanHeaderRows, emit prior ones before the table
+                    for (let h = 0; h < cleanHeaderRows.length - 1; h++) {
+                        outputLines.push(cleanHeaderRows[h]);
+                    }
+                } else {
+                    headerRow = '| ' + defaultHeader.join(' | ') + ' |';
+                }
+
+                // Preserve column alignments
+                const cleanDelimCells = delimCells.map(c => {
+                    const left = c.startsWith(':');
+                    const right = c.endsWith(':');
+                    if (left && right) return ':---:';
+                    if (right) return '---:';
+                    if (left) return ':---';
+                    return '---';
+                });
+                while (cleanDelimCells.length < colCount) cleanDelimCells.push('---');
+                const cleanDelim = '| ' + cleanDelimCells.join(' | ') + ' |';
+
+                // Add empty line before table if needed
+                if (outputLines.length > 0 && outputLines[outputLines.length - 1].trim() !== '') {
+                    outputLines.push('');
+                }
+
+                outputLines.push(headerRow);
+                outputLines.push(cleanDelim);
+                cleanBodyRows.forEach(r => outputLines.push(r));
+
+                // Add empty line after table
+                outputLines.push('');
+                continue;
+            }
+
+            outputLines.push(lines[i]);
+            i++;
+        }
+
+        return outputLines.join('\n');
+    }
+
+    /**
+     * Master function to normalize all Markdown tables
+     */
+    function normalizeMarkdownTables(markdown) {
+        if (!markdown || !markdown.includes('|')) return markdown;
+        let text = synthesizeMissingDelimiters(markdown);
+        text = repairMarkdownTables(text);
+        return text;
+    }
+
+    // =========================================================================
     // Word Desktop HTML Enhancement Pipeline
     // =========================================================================
 
@@ -131,6 +551,7 @@
      * - Transforms GitHub Alert Callouts ([!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION]) into Word Callout Boxes
      * - Transforms <del>/<s> strikethrough, <mark> highlight, <kbd> key tags into Office inline styles
      * - Transforms <details><summary> accordions into Office document panels
+     * - Enhances tables with border, padding, and header shading for MS Word Desktop
      */
     function enhanceHtmlForWord(html) {
         // 1. Task List Checkboxes (- [x] and - [ ])
@@ -192,6 +613,26 @@
             }
         });
 
+        // 6. Enhanced MS Word Desktop Tables
+        html = html.replace(/<table(?![^>]*border="0")(\s*[^>]*)?>/gi, () => {
+            return `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; margin: 8pt 0; width: 100%; border: 1pt solid #b4c6e7;">`;
+        });
+
+        html = html.replace(/<th(\s*[^>]*)?>/gi, (match, attrs) => {
+            const alignMatch = attrs ? attrs.match(/align=["']?(left|center|right)["']?/i) : null;
+            const textAlign = alignMatch ? alignMatch[1] : 'left';
+            return `<th style="border: 1pt solid #b4c6e7; background-color: #d9e1f2; font-weight: bold; color: ${headingColor}; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top;">`;
+        });
+
+        html = html.replace(/<td(\s*[^>]*)?>/gi, (match, attrs) => {
+            if (attrs && attrs.includes('border-left: 4pt solid')) {
+                return match;
+            }
+            const alignMatch = attrs ? attrs.match(/align=["']?(left|center|right)["']?/i) : null;
+            const textAlign = alignMatch ? alignMatch[1] : 'left';
+            return `<td style="border: 1pt solid #b4c6e7; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top; background-color: #ffffff; color: #1a1a1a;">`;
+        });
+
         return html;
     }
 
@@ -215,9 +656,11 @@
         // 1. Extract Math
         const { text, mathBlocks } = extractMath(raw);
 
-        // 2. Render Markdown to HTML & Enhance for Word
-        let html = marked.parse(text);
-        html = enhanceHtmlForWord(html);
+        // 2. Normalize and repair markdown tables
+        const tableNormalizedText = normalizeMarkdownTables(text);
+
+        // 3. Render Markdown to HTML
+        let html = marked.parse(tableNormalizedText);
 
         // Clean inline style attributes that force dark mode colors / backgrounds from pasted web HTML
         html = html.replace(/\s*style="[^"]*"/gi, (styleAttr) => {
@@ -226,7 +669,10 @@
                 .replace(/color\s*:[^;]+;?/gi, '');
         });
 
-        // 3. Inject Web Math (KaTeX with htmlAndMathml output)
+        // 4. Enhance for Word & Live Preview
+        html = enhanceHtmlForWord(html);
+
+        // 5. Inject Web Math (KaTeX with htmlAndMathml output)
         mathBlocks.forEach(({ tex, display, ph }) => {
             let rendered;
             try {
@@ -299,11 +745,14 @@
         // 1. Extract Math
         const { text, mathBlocks } = extractMath(rawMarkdown);
 
-        // 2. Render Markdown to base HTML & Enhance for Word
-        let html = marked.parse(text);
+        // 2. Normalize and repair markdown tables
+        const tableNormalizedText = normalizeMarkdownTables(text);
+
+        // 3. Render Markdown to base HTML & Enhance for Word
+        let html = marked.parse(tableNormalizedText);
         html = enhanceHtmlForWord(html);
 
-        // 3. Inject MathML for MS Word
+        // 4. Inject MathML for MS Word
         mathBlocks.forEach(({ tex, display, ph }) => {
             let mathmlTag = '';
             try {
