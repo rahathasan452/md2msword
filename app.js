@@ -614,23 +614,29 @@
         });
 
         // 6. Enhanced MS Word Desktop Tables
-        html = html.replace(/<table(?![^>]*border="0")(\s*[^>]*)?>/gi, () => {
+        html = html.replace(/<table\b(?![^>]*border="0")([^>]*)>/gi, () => {
             return `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; margin: 8pt 0; width: 100%; border: 1pt solid #b4c6e7;">`;
         });
 
-        html = html.replace(/<th(\s*[^>]*)?>/gi, (match, attrs) => {
+        html = html.replace(/<th\b([^>]*)>/gi, (match, attrs) => {
             const alignMatch = attrs ? attrs.match(/align=["']?(left|center|right)["']?/i) : null;
             const textAlign = alignMatch ? alignMatch[1] : 'left';
-            return `<th style="border: 1pt solid #b4c6e7; background-color: #d9e1f2; font-weight: bold; color: ${headingColor}; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top;">`;
+            const colspanMatch = attrs ? attrs.match(/colspan=["']?(\d+)["']?/i) : null;
+            const rowspanMatch = attrs ? attrs.match(/rowspan=["']?(\d+)["']?/i) : null;
+            const spanAttrs = (colspanMatch ? ` colspan="${colspanMatch[1]}"` : '') + (rowspanMatch ? ` rowspan="${rowspanMatch[1]}"` : '');
+            return `<th${spanAttrs} style="border: 1pt solid #b4c6e7; background-color: #d9e1f2; font-weight: bold; color: ${headingColor}; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top;">`;
         });
 
-        html = html.replace(/<td(\s*[^>]*)?>/gi, (match, attrs) => {
+        html = html.replace(/<td\b([^>]*)>/gi, (match, attrs) => {
             if (attrs && attrs.includes('border-left: 4pt solid')) {
                 return match;
             }
             const alignMatch = attrs ? attrs.match(/align=["']?(left|center|right)["']?/i) : null;
             const textAlign = alignMatch ? alignMatch[1] : 'left';
-            return `<td style="border: 1pt solid #b4c6e7; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top; background-color: #ffffff; color: #1a1a1a;">`;
+            const colspanMatch = attrs ? attrs.match(/colspan=["']?(\d+)["']?/i) : null;
+            const rowspanMatch = attrs ? attrs.match(/rowspan=["']?(\d+)["']?/i) : null;
+            const spanAttrs = (colspanMatch ? ` colspan="${colspanMatch[1]}"` : '') + (rowspanMatch ? ` rowspan="${rowspanMatch[1]}"` : '');
+            return `<td${spanAttrs} style="border: 1pt solid #b4c6e7; padding: 5pt 8pt; text-align: ${textAlign}; vertical-align: top; background-color: #ffffff; color: #1a1a1a;">`;
         });
 
         return html;
